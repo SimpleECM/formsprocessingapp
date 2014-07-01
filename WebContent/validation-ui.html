@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+
+	<!-- Basic Page Needs
+  	================================================== -->
+	<title>New Patient Registration</title>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+	
+  	<!-- CSS
+  	================================================== -->
+	<link rel="stylesheet" type="text/css" href="css/new-patient-form.css">
+	
+	<!-- JS
+  	================================================== -->
+  	<!--<script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js"></script>-->
+  	<script type="text/javascript" src="js/jquery.min.js"></script>
+  	<script type="text/javascript" src="js/bootstrap.min.js"></script>
+  	<script src="https://browserdriver.simpleecm.com/bd/1/latest/browser_driver.js"></script>
+
+	<!-- Javascript
+	================================================== -->
+	<script>
+		var currentJobImages = new Array();
+		var currentImageDisplayed = 0;
+		var scanSettings = {};
+		
+		function loadPage() {
+			readJsonFile();
+			initializeBD();
+		}
+		
+		function readJsonFile() {
+			//start ajax request
+			$.ajax({
+				//load data from locally saved json.  This could be replaced with database lookup
+				url: "data.json",
+				//force to handle it as text
+				dataType: "text",
+				success: function(data) {
+					var json = $.parseJSON(data);
+					if (json != null && json.code == 0){
+						displayFieldsExtracted(json);
+					}else{
+						alert('Invalid JSON');
+					}
+				}
+			});
+		}
+		
+		//loops through each extracted field and sets the document element with the same ID to that text value
+		//requires all extracted fields to have a matching elementId on the page
+		function displayFieldsExtracted(json) {
+			var i, j, fieldName, fieldText, fieldConfidence, formField;
+			for (i = 0; i < json.extractedInfo.length; i++) {
+				for (j = 0; j < json.extractedInfo[i].fieldResults.length; j++) {
+					fieldName = json.extractedInfo[i].fieldResults[j].name;
+					fieldText = json.extractedInfo[i].fieldResults[j].text;
+					fieldConfidence = parseInt(json.extractedInfo[i].fieldResults[j].confidence);
+					formField = document.getElementById(fieldName);
+					formField.value = fieldText;
+					if (fieldConfidence < 90)
+						//flags in orange fields with under 90 percent confidence
+						formField.classList.add("low-confidence-level");
+				}
+			}
+		} 
+		
+		function initializeBD() {
+        	var initArgs = {
+        		userId: "", //populate this using a SimpleECM GET/users call
+        		eventHandlerMap: {
+					runtimeDetected:  handleRuntimeDetected
+				},
+        		scanJobStartPolicy: {
+        			adf: "notify",
+        			handFeed: "autostart",
+        			platten: "notify"
+        		}
+        	};
+			$BROWSER_DRIVER.initialize(initArgs);
+		}
+		
+		function handleRuntimeDetected() {
+			//load all locally saved images, presumably those scanned and submitted using validation-ui.html
+			currentJobImages = $BROWSER_DRIVER.getInitialImages();
+			var currentImageId = currentJobImages[0].id;
+			document.getElementById("scannedImages").src = $BROWSER_DRIVER.getUrlForImage(currentImageId,306);
+			if (currentJobImages.length > 1) {
+				document.getElementById("nextButton").disabled = false;
+				document.getElementById("nextButton").className = "btn-arrow";
+			}
+		}
+		
+		function prevImage() {
+			currentImageDisplayed --;
+			document.getElementById("scannedImages").src = $BROWSER_DRIVER.getUrlForImage(currentJobImages[currentImageDisplayed],306);
+			document.getElementById("nextButton").disabled = false;
+			document.getElementById("nextButton").className = "btn-arrow";
+			if (currentImageDisplayed == 0) {
+				document.getElementById("prevButton").disabled = true;
+				document.getElementById("prevButton").className = "btn-arrow-inactive";
+			}
+		}
+		
+		function nextImage() {
+			currentImageDisplayed ++;
+			document.getElementById("scannedImages").src = $BROWSER_DRIVER.getUrlForImage(currentJobImages[currentImageDisplayed],306);
+			document.getElementById("prevButton").disabled = false;
+			document.getElementById("prevButton").className = "btn-arrow";
+			if (currentImageDisplayed == (currentJobImages.length - 1)) {
+				document.getElementById("nextButton").disabled = true;
+				document.getElementById("nextButton").className = "btn-arrow-inactive";
+			}
+		}
+		
+	</script>
+</head>
+
+<body onload="loadPage()">
+
+<div class="modalDialog visible">
+	<center>
+	<div id="validation-ui-modal" class="round-box verify-modal-size">
+
+		<a href=""><img src="images/close.png" class="x-close"/></a>
+                
+		<table width="900" border="0">
+  			<tr>
+				<td width="20">
+					<button id="prevButton" onclick="prevImage()" disabled class="btn-arrow-inactive">&#60;</button>
+				</td>	
+				<td width="310">
+					<p class="branding-logo"><img src="images/brain-hospital.png"></p>
+					<iframe id="scannedImages" style="width:306px;height:400px;" src=""></iframe>
+				</td>	
+				<td width="20">
+					<button id="nextButton" onclick="nextImage()" disabled class="btn-arrow-inactive">&#62;</button>
+				</td>
+				<td>	
+                								<div class="header-text">New Patient Registration</div>
+                    <div class="form-window">
+					<div class="scrollit">
+                                               <p class="header-text2">Patient Information</p>
+					<Table>
+						<tr>
+						   <td>
+						   </td>
+						</tr>
+							<td>
+								<table>
+									<tr>
+										<td width="20">
+										<td align="center">Last Name</td>
+										<td align="center">First Name</td>
+									</tr>
+									<tr>
+										<td align="center" valign="top"></td>
+										<td align="center"><input id="patientLastName" type="text" class="field-half"></td>
+										<td align="center"><input id="patientFirstName" type="text" class="field-half"></td>
+									</tr>	
+                                    <tr>
+										<td>
+										<td align="center">Birth Date</td>
+										<td align="center">Sex</td>
+									</tr>
+									<tr>
+										<td align="center" valign="top"></td>
+										<td align="center"><input id="patientBirthDate" type="text" class="field-date"></td>
+										<td align="center"><strong>M</strong><input id="patientSexM" class="css-checkbox" type="checkbox" checked="checked" />
+					<label for="demo_box_1" name="demo_lbl_1" class="css-label"></label><strong>F</strong><input id="patientSexF" class="css-checkbox" type="checkbox" />
+								<label for="demo_box_2" name="demo_lbl_2" class="css-label"></label>
+                                     </td>
+									</tr>	
+								</table>
+							
+							</td>
+						</tr>
+                        
+                        <tr>
+                        	<td>
+                            	<table>
+                                	<tr>
+                                    	<td width="20"></td>
+                                    	<td align="center">Street Address</td>
+                                    </tr>
+                                    <tr>
+                                    	<td width="20"></td>
+                                        <td><input id="patientAddress" type="text" class="field-address"></td>
+                                    </tr>
+                                </table>
+                                       
+                            </td>    
+            			</tr>
+                        <tr>
+                        	<td>
+                        <table>
+									<tr>
+										<td width="20">
+										<td align="center">City</td>
+										<td align="center">State</td>
+                                        <td align="center">Zip Code</td>
+									</tr>
+									<tr>
+										<td align="center" valign="top"></td>
+										<td align="center"><input id="patientCity" type="text" class="field-city"></td>
+										<td align="center"><input id="patientState" type="text" class="field-state"></td>
+										<td align="center"><input id="patientZip" type="text" class="field-zip"></td>
+									</tr>	
+                                   
+                        	</td>
+                        </tr>
+                        
+                        </table>   
+                      
+							</td>
+						</tr>
+                        </table>
+                        								<br><div class="header-text2">Primary Policy Cardholder Information</div>
+                        <table>
+                        <tr>
+						   <td>
+						   </td>
+						</tr>
+                        <tr>
+							<td>
+								<table>
+									<tr>
+										<td width="20">
+										<td align="center">Last Name</td>
+										<td align="center">First Name</td>
+									</tr>
+									<tr>
+										<td align="center" valign="top"></td>
+										<td align="center"><input id="cardholderLastName" type="text" class="field-half"></td>
+										<td align="center"><input id="cardholderFirstName" type="text" class="field-half"></td>
+									</tr>	
+                                    <tr>
+										<td>
+										<td align="center">Birth Date</td>
+										<td align="center">Sex</td>
+									</tr>
+									<tr>
+										<td align="center" valign="top"></td>
+										<td align="center"><input id="cardholderBirthDate" type="text" class="field-date"></td>
+										<td align="center"><strong>M</strong><input id="cardholderSexM" class="css-checkbox" type="checkbox" checked="checked" />
+					<label for="demo_box_3" name="demo_lbl_3" class="css-label"></label><strong>F</strong><input id="cardholderSexF" class="css-checkbox" type="checkbox" />
+								<label for="demo_box_4" name="demo_lbl_4" class="css-label"></label>
+                                     </td>
+									</tr>	
+								</table>
+							
+							</td>
+						</tr>
+                        <tr>
+                        	<td>
+                            	<table>
+                                	<tr>
+                                    	<td width="20"></td>
+                                    	<td align="center">Street Address</td>
+                                    </tr>
+                                    <tr>
+                                    	<td></td>
+                                        <td><input id="cardholderAddress" type="text" class="field-address"></td>
+                                    </tr>
+                                </table>
+                                       
+                            </td>    
+            			</tr>
+                        <tr>
+                        	<td>
+                        <table>
+									<tr>
+										<td width="20"></td>
+										<td align="center">City</td>
+										<td align="center">State</td>
+                                        <td align="center">Zip Code</td>
+									</tr>
+									<tr>
+										<td align="center" valign="top"></td>
+										<td align="center"><input id="cardholderCity" type="text" class="field-city"></td>
+										<td align="center"><input id="cardholderState" type="text" class="field-state"></td>
+										<td align="center"><input id="cardholderZip" type="text" class="field-zip"></td>
+									</tr>	
+                                   
+                        	</td>
+                        </tr>
+                        
+                        </table>   
+                        <tr>
+							<td>
+								<table>
+									<tr>
+										<td width="20"></td>
+										<td align="center">Email</td>
+										<td align="center">Phone</td>
+									</tr>
+									<tr>
+										<td align="center" valign="top"></td>
+										<td align="center"><input id="cardholderEmail" type="text" class="field-email"></td>
+										<td align="center"><input id="cardholderPhone" type="text" class="field-phone"></td>
+									</tr>	
+                                 </table>
+							</td>
+						</tr>
+                        </table>
+                        
+                        								<br><div class="header-text2">Insurance Information</div>
+                                <table>
+                                	<tr>
+										<td width="20"></td>
+										<td align="center">Provider</td>
+										<td align="center">Effective Date</td>
+									</tr>
+									<tr>
+										<td></td>
+										<td align="center"><input id="" type="text" class="field-provider"></td>
+										<td align="center"><input id="" type="text" class="field-date"></td>
+									</tr>
+                                </table>
+                        <table>
+                        
+                        <tr>
+							<td>
+								<table>
+                                	<tr>
+										<td width="20"></td>
+										<td align="center">Health Plan #</td>
+										<td align="center">Member ID #</td>
+									</tr>
+									<tr>
+										<td></td>
+										<td align="center"><input id="" type="text" class="field-half"></td>
+										<td align="center"><input id="memberId" type="text" class="field-half"></td>
+									</tr>	
+                                    <tr>
+										<td></td>
+										<td align="center">Group #</td>
+										<td align="center">Payer ID #</td>
+									</tr>
+									<tr>
+										<td></td>
+										<td align="center"><input id="groupNumber" type="text" class="field-half"></td>
+										<td align="center"><input id="issuer" type="text" class="field-half"></td>
+									</tr>	
+								</table>
+                             
+							</td>
+						</tr>
+                        
+                        </table>
+                     								<br><div class="header-text2">Copays</div>
+                        <center>
+                        <table>
+                        
+                        <tr>
+							<td>
+								<table>
+									<tr>
+										<td align="center">Office</td>
+										<td align="center">Urgent</td>
+                                        <td align="center">ER</td>
+										<td align="center">Specialty</td>
+									</tr>
+									<tr>
+										<td align="center"><input id="" type="text" class="field-copay"></td>
+										<td align="center"><input id="" type="text" class="field-copay"></td>
+                                        <td align="center"><input id="" type="text" class="field-copay"></td>
+										<td align="center"><input id="" type="text" class="field-copay"></td>
+									</tr>	
+                                    
+								</table>
+							<br><br>
+							</td>
+						</tr>
+                        
+                        
+                        </table>   
+                        </center>
+                   </div>     
+                        <table>                       
+              			<tr>
+							<td>
+								<div class="submit-cancel">
+									<table width="420">
+										<tr>
+										
+										<td valign="top">
+										</td>
+										<td align="right" valign="top">
+											<a id="sendButton" class="btn disabled">Submit</a>
+										</td>
+										<td align="left" valign="top">&nbsp;
+											<a href="#" id="cancelButton" class="btn btn-danger">Cancel</a>
+										</td>
+										</tr>
+									 </table>                		
+								</div></div>
+							</td>
+						</tr>
+        			</table>
+    			</td>
+  			</tr>
+		</table>
+	</div> 
+</center>
+</div>
+</body>
+</html>

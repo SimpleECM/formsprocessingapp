@@ -1,0 +1,194 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+ <!-- CSS================================================== -->
+<link rel="stylesheet" type="text/css" href="css/simplecapture.css">
+    
+<head>
+	<title>SimpleECM Medical Demo</title>
+	//the browser driver's only dependency is jquery
+	<script src="js/jquery-1.11.0.js"></script>
+	<script src="https://browserdriver.simpleecm.com/bd/1/latest/browser_driver.js"></script>
+	<script>
+		var currentJobImages = new Array();
+		var currentImageDisplayed = 0;
+		var scanSettings = {};
+		function initializeBD() {
+        	var initArgs = {
+        		userId: "",  //populate this using a SimpleECM GET/users call
+        		eventHandlerMap: {
+        			//see SimpleECM dev portal for a list of browser driver events - map each event you want to handle to a handler function
+					noRuntimeDetected: handleNoRuntimeDetected,
+					runtimeDetected:  handleRuntimeDetected,
+					deviceVanished: handleDeviceVanished,
+					deviceDetected: handleDeviceDetected,
+					deviceReady: handleDeviceReady,
+					deviceUnready: handleDeviceUnready,
+					newImageReady: handleNewImageReady,
+					documentSent: handleDocumentSent
+				},
+        		scanJobStartPolicy: {
+        			adf: "notify",
+        			handFeed: "autostart",
+        			platten: "notify"
+        		}
+        	};
+			$BROWSER_DRIVER.initialize(initArgs);
+			//notice that this is the only browser driver function called - others can only be called once a subsequent event lets us know that it is successfully initialized
+		}
+		
+		function handleNoRuntimeDetected(runtimeUrl) {
+			document.getElementById("statusMessage").innerHTML = "No Runtime Detected - download from: <BR>" + runtimeUrl;
+		}
+		
+		function handleRuntimeDetected() {
+			$BROWSER_DRIVER.deleteAllImages();
+		}
+		
+		function handleDeviceVanished() {
+			document.getElementById("statusMessage").innerHTML = "Please attach a scanner";
+		}
+		
+		//the attachedDevice arg is a complex object telling us all about the device
+		function handleDeviceDetected(attachedDevice) {
+			//the capabilities object includes a function toSettings that returns a settings object with the device's default settings
+			scanSettings = attachedDevice.capabilities.toSettings();
+			document.getElementById("statusMessage").innerHTML = "Scanner ready - please load a document";
+		}
+		
+		function handleDeviceReady() {
+			document.getElementById("statusMessage").innerHTML = "Scanner ready";
+			document.getElementById("scanButton").disabled = false;
+			document.getElementById("scanButton").className = "btn-green";
+		}
+		
+		function handleDeviceUnready() {
+			document.getElementById("statusMessage").innerHTML = "Scanner ready - please load a document";
+			document.getElementById("scanButton").disabled = true;
+			document.getElementById("scanButton").className = "btn-inactive";
+		}
+		
+		//the newImageReady event gives us an object with a few properties, of which we'll only use the ID
+		function handleNewImageReady(newScannedImage) {
+			document.getElementById("sendButton").disabled = false;
+			document.getElementById("sendButton").className = "btn-green";
+			document.getElementById("clearButton").disabled = false;
+			document.getElementById("clearButton").className = "btn-clear";
+			//hide the status message, since it overlaps the image in this UI
+			document.getElementById("statusMessage").style.display = "none";
+			var currentImageId = newScannedImage.id;
+			//log the ID in the currentJobImages array
+			currentJobImages.push(currentImageId);
+			if (currentJobImages.length == 1)
+				//if this is our first image, display it
+				document.getElementById("scannedImages").src = $BROWSER_DRIVER.getUrlForImage(currentImageId,306);
+			else {
+				//otherwise, just make sure the next button is enabled
+				document.getElementById("nextButton").disabled = false;
+				document.getElementById("nextButton").className = "btn-arrow";
+			}
+		}
+		
+		function handleDocumentSent() {
+			document.getElementById("statusMessage").innerHTML = "Document Sent";
+			document.getElementById("toValidation").disabled = false;
+			document.getElementById("toValidation").className = "btn-clear";
+		}
+		
+		
+		
+		function startScan() {
+			//note that this demo simply uses the device's default settings.  More advanced capture pages should alter the settings object
+			$BROWSER_DRIVER.startCaptureJob(scanSettings);
+		}
+		
+		function prevImage() {
+			currentImageDisplayed --;
+			//getUrlForImage takes an imageID and a desired width and returns a local URL to a .jpg
+			document.getElementById("scannedImages").src = $BROWSER_DRIVER.getUrlForImage(currentJobImages[currentImageDisplayed],306);
+			document.getElementById("nextButton").disabled = false;
+			document.getElementById("nextButton").className = "btn-arrow";
+			if (currentImageDisplayed == 0) {
+				//if we're back to the first image, disable the prevButton
+				document.getElementById("prevButton").disabled = true;
+				document.getElementById("prevButton").className = "btn-arrow-inactive";
+			}
+		}
+		
+		function nextImage() {
+			currentImageDisplayed ++;
+			document.getElementById("scannedImages").src = $BROWSER_DRIVER.getUrlForImage(currentJobImages[currentImageDisplayed],306);
+			document.getElementById("prevButton").disabled = false;
+			document.getElementById("prevButton").className = "btn-arrow";
+			if (currentImageDisplayed == (currentJobImages.length - 1)) {
+				//if we're on the last image, disable the nextButton
+				document.getElementById("nextButton").disabled = true;
+				document.getElementById("nextButton").className = "btn-arrow-inactive";
+			}
+		}
+		
+		function sendDocument() {
+			document.getElementById("sendButton").disabled = true;
+			document.getElementById("sendButton").className = "btn-inactive";
+			document.getElementById("nextButton").disabled = true;
+			document.getElementById("nextButton").className = "btn-arrow-inactive";
+			document.getElementById("prevButton").disabled = true;
+			document.getElementById("prevButton").className = "btn-arrow-inactive";
+			document.getElementById("clearButton").disabled = true;
+			document.getElementById("clearButton").className = "btn-clear-inactive";
+			document.getElementById("scannedImages").src = "";
+			document.getElementById("statusMessage").innerHTML = "Sending to forms processing...";
+			document.getElementById("statusMessage").style.display = "inline";
+			var docToSend = [];
+			var i, pageN, imageId;
+			for(i = 0; i < currentJobImages.length; i++) {
+				docToSend.push({pageN: (i + 1), imageId: currentJobImages[i]});
+			}
+			var d = new Date();
+			var n = d.getTime();
+			var sendArgs = {
+				pages: docToSend,
+				//pass a url where a servlet is waiting for a pdf file to submit for form extraction
+            	submissionUrl: "https://dev.testco.com/doFormExtract",
+            	//pass an array of parameters - in this case, the name of the formSet to use
+            	parameters: [{ name: "formSetId", value: "MedicalForms" }],
+            	//pass a filename - I've appended datetime to make each unique
+            	filename: "medDemo" + n + ".pdf",
+            	//pass the name of the file parameter that your servlet will be expecting
+            	fileParameterName: "filledForms"
+			};
+			$BROWSER_DRIVER.sendDocument(sendArgs);
+		}
+		
+		function clearImages() {
+			document.getElementById("sendButton").disabled = true;
+			document.getElementById("sendButton").className = "btn-inactive";
+			document.getElementById("nextButton").disabled = true;
+			document.getElementById("nextButton").className = "btn-arrow-inactive";
+			document.getElementById("prevButton").disabled = true;
+			document.getElementById("prevButton").className = "btn-arrow-inactive";
+			document.getElementById("clearButton").disabled = true;
+			document.getElementById("clearButton").className = "btn-clear-inactive";
+			$BROWSER_DRIVER.deleteAllImages();
+			currentJobImages = [];
+			document.getElementById("scannedImages").src = "";
+			currentImageDisplayed = 0;
+			document.getElementById("statusMessage").style.display = "inline";
+		}
+	</script>
+</head>
+
+<body onload="initializeBD()">
+<center>
+<p class="branding"><img src="images/brain-hospital.png" /></p>
+   	<span id="statusMessage" class="spinner-position"><div class="spinner medium"></div></span>
+	<iframe id="scannedImages" style="width:306px;height:400px;" src=""></iframe><br />
+	<div class="arrow-position">
+    <button id="prevButton" onclick="prevImage()" disabled class="btn-arrow-inactive" style="float:left;">&#60;</button>
+    <button id="nextButton" onclick="nextImage()" disabled class="btn-arrow-inactive" style="float:right;">&#62;</button></div>
+	<button id="scanButton" onclick="startScan()" disabled class="btn-inactive">Scan</button>
+    <button id="sendButton" onclick="sendDocument()" disabled class="btn-inactive">Send</button><br />
+	<button id="clearButton" onclick="clearImages()" disabled class="btn-clear-inactive">Clear</button>&nbsp;
+	<form action="http://dev.testco.com/validation-ui.html"><button id="toValidation" type="submit" disabled class="btn-clear-inactive">Next &#62;</button></form>
+</center></body>
+</html>
