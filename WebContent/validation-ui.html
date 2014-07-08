@@ -87,7 +87,6 @@
 			document.getElementById("scannedImages").src = $BROWSER_DRIVER.getUrlForImage(currentImageId,306);
 			if (currentJobImages.length > 1) {
 				document.getElementById("nextButton").disabled = false;
-				document.getElementById("nextButton").className = "btn-arrow";
 			}
 		}
 		
@@ -95,22 +94,16 @@
 			currentImageDisplayed --;
 			document.getElementById("scannedImages").src = $BROWSER_DRIVER.getUrlForImage(currentJobImages[currentImageDisplayed],306);
 			document.getElementById("nextButton").disabled = false;
-			document.getElementById("nextButton").className = "btn-arrow";
-			if (currentImageDisplayed == 0) {
+			if (currentImageDisplayed == 0)
 				document.getElementById("prevButton").disabled = true;
-				document.getElementById("prevButton").className = "btn-arrow-inactive";
-			}
 		}
 		
 		function nextImage() {
 			currentImageDisplayed ++;
 			document.getElementById("scannedImages").src = $BROWSER_DRIVER.getUrlForImage(currentJobImages[currentImageDisplayed],306);
 			document.getElementById("prevButton").disabled = false;
-			document.getElementById("prevButton").className = "btn-arrow";
-			if (currentImageDisplayed == (currentJobImages.length - 1)) {
+			if (currentImageDisplayed == (currentJobImages.length - 1))
 				document.getElementById("nextButton").disabled = true;
-				document.getElementById("nextButton").className = "btn-arrow-inactive";
-			}
 		}
 		
 	</script>
@@ -127,14 +120,14 @@
 		<table width="900" border="0">
   			<tr>
 				<td width="20">
-					<button id="prevButton" onclick="prevImage()" disabled class="btn-arrow-inactive">&#60;</button>
+					<button id="prevButton" onclick="prevImage()" disabled class="btn-arrow">&#60;</button>
 				</td>	
 				<td width="310">
 					<p class="branding-logo"><img src="images/brain-hospital.png"></p>
 					<iframe id="scannedImages" style="width:306px;height:400px;" src=""></iframe>
 				</td>	
 				<td width="20">
-					<button id="nextButton" onclick="nextImage()" disabled class="btn-arrow-inactive">&#62;</button>
+					<button id="nextButton" onclick="nextImage()" disabled class="btn-arrow">&#62;</button>
 				</td>
 				<td>	
                 								<div class="header-text">New Patient Registration</div>
