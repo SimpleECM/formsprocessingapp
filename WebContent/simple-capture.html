@@ -6,8 +6,7 @@
     
 <head>
 	<title>SimpleECM Medical Demo</title>
-	//the browser driver's only dependency is jquery
-	<script src="js/jquery-1.11.0.js"></script>
+	<script src="js/jquery-1.11.0.js">//the browser driver's only dependency is jquery</script>
 	<script src="https://browserdriver.simpleecm.com/bd/1/latest/browser_driver.js"></script>
 	<script>
 		var currentJobImages = new Array();
@@ -78,10 +77,8 @@
 			if (currentJobImages.length == 1)
 				//if this is our first image, display it
 				document.getElementById("scannedImages").src = $BROWSER_DRIVER.getUrlForImage(currentImageId,306);
-			else {
-				//otherwise, just make sure the next button is enabled
-				document.getElementById("nextButton").disabled = false;
-			}
+			//otherwise, just make sure the next button is enabled
+			else document.getElementById("nextButton").disabled = false;
 		}
 		
 		function handleDocumentSent() {
@@ -111,10 +108,9 @@
 			currentImageDisplayed ++;
 			document.getElementById("scannedImages").src = $BROWSER_DRIVER.getUrlForImage(currentJobImages[currentImageDisplayed],306);
 			document.getElementById("prevButton").disabled = false;
-			if (currentImageDisplayed == (currentJobImages.length - 1)) {
+			if (currentImageDisplayed == (currentJobImages.length - 1))
 				//if we're on the last image, disable the nextButton
 				document.getElementById("nextButton").disabled = true;
-			}
 		}
 		
 		function sendDocument() {

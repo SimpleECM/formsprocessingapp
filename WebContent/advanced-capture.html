@@ -1,0 +1,356 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+ <!-- CSS================================================== -->
+<link rel="stylesheet" type="text/css" href="css/simplecapture.css">
+<link rel="stylesheet" type="text/css" href="css/component.css" />
+  
+<head>
+	<title>SimpleECM Demo Advanced Capture Page</title>
+	<script src="js/jquery-1.11.0.js">//the browser driver's only dependency is jquery</script>
+	<script src="https://browserdriver.simpleecm.com/bd/1/latest/browser_driver.js"></script>
+	<script>
+		var currentJobImages = new Array();
+		var currentImageDisplayed = 0;
+		var deviceCapabilities = {};
+		var scanSettings = {};
+		function initializeBD() {
+        	var initStruct = {
+        		userId: "", //populate this using a SimpleECM GET/users call
+        		eventHandlerMap: {
+        			//see SimpleECM dev portal for a list of browser driver events - map each event you want to handle to a handler function
+					noRuntimeDetected: handleNoRuntimeDetected,
+					runtimeDetected:  handleRuntimeDetected,
+					deviceVanished: handleDeviceVanished,
+					deviceDetected: handleDeviceDetected,
+					deviceReady: handleDeviceReady,
+					deviceUnready: handleDeviceUnready,
+					newImageReady: handleNewImageReady,
+					documentSent: handleDocumentSent
+				},
+        		scanJobStartPolicy: {
+        			adf: "notify",
+        			handFeed: "autostart",
+        			platten: "notify"
+        		}
+        	};
+			$BROWSER_DRIVER.initialize(initStruct);
+			//notice that this is the only browser driver function called - others can only be called once a subsequent event lets us know that it is successfully initialized
+		}
+		
+		function handleNoRuntimeDetected(runtimeUrl) {
+			document.getElementById("statusMessage").innerHTML = "No Runtime Detected - download from: <BR>" + runtimeUrl;
+		}
+		
+		function handleRuntimeDetected() {
+			$BROWSER_DRIVER.deleteAllImages();
+		}
+		
+		function handleDeviceVanished() {
+			document.getElementById("statusMessage").innerHTML = "Please attach a scanner";
+		}
+		
+		//the attachedDevice arg is a complex object telling us all about the device
+		function handleDeviceDetected(attachedDevice) {
+			//it includes a function to get a capabilities object telling us the full range of settings possible on the device
+			deviceCapabilities = attachedDevice.getCapabilities();
+			//the capabilities object itself has a function to create a settings object using the default settings for this device
+			scanSettings = deviceCapabilities.toSettings();
+			loadSettings();
+			document.getElementById("statusMessage").innerHTML = "Scanner ready - please load a document";
+			document.getElementById("settingsButton").disabled = false;
+		}
+		
+		function handleDeviceReady() {
+			document.getElementById("statusMessage").innerHTML = "Scanner ready";
+			document.getElementById("scanButton").disabled = false;
+		}
+		
+		function handleDeviceUnready() {
+			document.getElementById("statusMessage").innerHTML = "Scanner ready - please load a document";
+			document.getElementById("scanButton").disabled = true;
+		}
+		
+		//the newImageReady event gives us an object with a few properties, of which we'll only use the ID
+		function handleNewImageReady(newScannedImage) {
+			document.getElementById("sendButton").disabled = false;
+			document.getElementById("clearButton").disabled = false;
+			//hide the status message, since it overlaps the image in this UI
+			document.getElementById("statusMessage").style.display = "none";
+			var currentImageId = newScannedImage.id;
+			//log the ID in the currentJobImages array
+			currentJobImages.push(currentImageId);
+			if (currentJobImages.length == 1)
+				//if this is our first image, display it
+				document.getElementById("scannedImages").src = $BROWSER_DRIVER.getUrlForImage(currentImageId,306);
+			//otherwise, just make sure the next button is enabled
+			else document.getElementById("nextButton").disabled = false;
+		}
+		
+		function handleDocumentSent() {
+			document.getElementById("statusMessage").innerHTML = "Document Sent";
+			document.getElementById("toValidation").disabled = false;
+		}
+		
+		
+		
+		function startScan() {
+			//the settings object includes a function to adjust itself to be compatible with the current device if it isn't already
+			scanSettings.reconcileWithCapabilities(deviceCapabilities);
+			//startCaptureJob takes this settings object as its only arg and starts a scan with those settings
+			$BROWSER_DRIVER.startCaptureJob(scanSettings);
+		}
+		
+		function prevImage() {
+			currentImageDisplayed --;
+			//getUrlForImage takes an imageID and a desired width and returns a local URL to a .jpg
+			document.getElementById("scannedImages").src = $BROWSER_DRIVER.getUrlForImage(currentJobImages[currentImageDisplayed],306);
+			document.getElementById("nextButton").disabled = false;
+			if (currentImageDisplayed == 0)
+				//if we're back to the first image, disable the prevButton
+				document.getElementById("prevButton").disabled = true;
+		}
+		
+		function nextImage() {
+			currentImageDisplayed ++;
+			document.getElementById("scannedImages").src = $BROWSER_DRIVER.getUrlForImage(currentJobImages[currentImageDisplayed],306);
+			document.getElementById("prevButton").disabled = false;
+			if (currentImageDisplayed == (currentJobImages.length - 1))
+				//if we're on the last image, disable the nextButton
+				document.getElementById("nextButton").disabled = true;
+		}
+		
+		function sendDocument() {
+			document.getElementById("sendButton").disabled = true;
+			document.getElementById("nextButton").disabled = true;
+			document.getElementById("prevButton").disabled = true;
+			document.getElementById("clearButton").disabled = true;
+			document.getElementById("scannedImages").src = "";
+			document.getElementById("statusMessage").innerHTML = "Sending to forms processing...";
+			document.getElementById("statusMessage").style.display = "inline";
+			var docToSend = [];
+			var i, pageN, imageId;
+			for(i = 0; i < currentJobImages.length; i++) {
+				docToSend.push({pageN: (i + 1), imageId: currentJobImages[i]});
+			}
+			var d = new Date();
+			var n = d.getTime();
+			var sendArgs = {
+				pages: docToSend,
+				//pass a url where a servlet is waiting for a pdf file to submit for form extraction
+            	submissionUrl: "https://demo.simpleecm.com/doFormExtract",
+            	//pass an array of parameters - in this case, the name of the formSet to use
+            	parameters: [{ name: "formSetId", value: "MedicalForms" }],
+            	//pass a filename - I've appended datetime to make each unique
+            	filename: "medDemo" + n + ".pdf",
+            	//pass the name of the file parameter that your servlet will be expecting
+            	fileParameterName: "filledForms"
+			};
+			$BROWSER_DRIVER.sendDocument(sendArgs);
+		}
+		
+		function clearImages() {
+			document.getElementById("sendButton").disabled = true;
+			document.getElementById("nextButton").disabled = true;
+			document.getElementById("prevButton").disabled = true;
+			document.getElementById("clearButton").disabled = true;
+			$BROWSER_DRIVER.deleteAllImages();
+			currentJobImages = [];
+			document.getElementById("scannedImages").src = "";
+			currentImageDisplayed = 0;
+			document.getElementById("statusMessage").style.display = "inline";
+		}
+		
+		//loads the settings UI with the settings currently in the settings object
+		function loadSettings() {
+			//settingForCapability takes a capability name and returns the current setting value for that capability
+			var colorDepthValue = scanSettings.settingForCapability("colorDepth");
+			var widthValue = scanSettings.settingForCapability("width");
+			var horizontalResolutionValue = scanSettings.settingForCapability("horizontalResolution");
+			var sidednessValue = scanSettings.settingForCapability("sidedness");
+			var highlightValue = scanSettings.settingForCapability("highlight");
+			var shadowValue = scanSettings.settingForCapability("shadow");
+			var gammaValue = scanSettings.settingForCapability("gamma");
+			var brightnessValue = scanSettings.settingForCapability("brightness");
+			var contrastValue = scanSettings.settingForCapability("contrast");
+			var autoCropValue = scanSettings.settingForCapability("autoCrop");
+			var autoRotateValue = scanSettings.settingForCapability("autoRotate");
+			var deskewValue = scanSettings.settingForCapability("deskew");
+			var blankPageDetectionValue = scanSettings.settingForCapability("blankPageDetection");
+			document.getElementById(colorDepthValue).checked = true;
+			document.getElementById("width").value = widthValue;
+			document.getElementById("horizontalResolution").value = horizontalResolutionValue;
+			if (sidednessValue == "duplex")
+				document.getElementById("sidedness").checked = true;
+			document.getElementById("highlight").value = highlightValue;
+			document.getElementById("shadow").value = shadowValue;
+			document.getElementById("gamma").value = gammaValue;
+			document.getElementById("brightness").value = brightnessValue;
+			document.getElementById("contrast").value = contrastValue;
+			document.getElementById("autoCrop").checked = autoCropValue;
+			document.getElementById("autoRotate").checked = autoRotateValue;
+			document.getElementById("deskew").checked = deskewValue;
+			document.getElementById("blankPageDetection").checked = blankPageDetectionValue;
+		}
+		
+		//saves the settings from the settings UI to the settings object
+		function saveSettings() {
+			var colorDepthValue = document.querySelector('input[name="colorDepth"]:checked').value;
+			var widthValue = document.getElementById("width").value;
+			var lengthValue;
+			if (widthValue == "3500")
+				lengthValue = 2000;
+			else lengthValue = 11000;
+			var horizontalResolutionValue = document.getElementById("horizontalResolution").value;
+			var verticalResolutionValue = horizontalResolutionValue;
+			var sidednessValue;
+			if (document.getElementById("sidedness").checked)
+				sidednessValue = "duplex";
+			else sidednessValue = "simplex";
+			var highlightValue = document.getElementById("highlight").value;
+			var shadowValue = document.getElementById("shadow").value;
+			var gammaValue = document.getElementById("gamma").value;
+			var brightnessValue = document.getElementById("brightness").value;
+			var contrastValue = document.getElementById("contrast").value;
+			var autoCropValue = document.getElementById("autoCrop").checked;
+			var autoRotateValue = document.getElementById("autoRotate").checked;
+			var deskewValue = document.getElementById("deskew").checked;
+			var blankPageDetectionValue = document.getElementById("blankPageDetection").checked;
+			//the override function takes a capability name and a value and updates that setting in the settings object 
+			scanSettings.override("colorDepth", colorDepthValue);
+			scanSettings.override("width", widthValue);
+			scanSettings.override("length", lengthValue);
+			scanSettings.override("horizontalResolution", horizontalResolutionValue);
+			scanSettings.override("verticalResolution", verticalResolutionValue);
+			scanSettings.override("sidedness", sidednessValue);
+			scanSettings.override("highlight", highlightValue);
+			scanSettings.override("shadow", shadowValue);
+			scanSettings.override("gamma", gammaValue);
+			scanSettings.override("brightness", brightnessValue);
+			scanSettings.override("contrast", contrastValue);
+			scanSettings.override("autoCrop", autoCropValue);
+			scanSettings.override("autoRotate", autoRotateValue);
+			scanSettings.override("deskew", deskewValue);
+			scanSettings.override("blankPageDetection", blankPageDetectionValue);
+		}
+	</script>
+</head>
+
+<body onload="initializeBD()">
+<center>
+<p class="branding"><img src="images/brain-hospital.png"></p>
+   	<span id="statusMessage" class="spinner-position"><div class="spinner medium"></div></span>
+	<iframe id="scannedImages" style="width:306px;height:400px;" src=""></iframe><br />
+	<div class="arrow-position">
+    <button id="prevButton" onclick="prevImage()" disabled class="btn-arrow" style="float:left;">&#60;</button>
+    <button id="nextButton" onclick="nextImage()" disabled class="btn-arrow" style="float:right;">&#62;</button></div>
+	<button id="scanButton" onclick="startScan()" disabled class="btn-green">Scan</button>
+    <button id="sendButton" onclick="sendDocument()" disabled class="btn-green">Send</button><br />
+	<button id="clearButton" onclick="clearImages()" disabled class="btn-clear">Clear</button>
+	<button id="settingsButton" disabled class="md-trigger btn-clear" data-modal="modal-1">Settings</button><br />
+	<form action="http://demo.simpleecm.com/new-patient-form.html"><button id="toValidation" type="submit" disabled class="btn-clear">Next &#62;</button></form>
+  <div class="md-modal md-effect-1" id="modal-1">
+			<div class="md-content">
+				<h3> </h3>
+				<div align="center" style="margin-top:7px;">
+                <table width="500">
+                <tr>
+                <td align="left" valign="top">               
+					<input type="radio" id="color24" name="colorDepth" value="fullColor24">
+       				<label for="color24">Full Color</label>
+    				<input type="radio" id="bw" name="colorDepth" value="bw">
+       				<label for="bw">Black &amp; White</label>
+    				<input type="radio" id="grayscale8" name="colorDepth" value="grayscale8">
+       				<label for="grayscale8">Grayscale</label><br />
+                </td>
+                <td align="right" valign="top">
+                	<select id="width">
+   						<option value="8500">Letter</option>
+  						<option value="3500">Business Card</option>
+					</select><br />
+                    <select id="horizontalResolution">
+  						<option value="75">75 dpi</option>
+                        <option value="150">150 dpi</option>
+                        <option value="300">300 dpi</option>
+					</select>
+                </td>
+                </tr>
+                </table>
+                <table width="550">
+                <tr>
+                <td align="center" valign="middle">
+					<span class="toggle">
+    					<input type="checkbox" id="sidedness">
+    					<label data-off="Single-Sided" data-on="Double-Sided"></label>
+					</span>	<br />
+                </td>   
+                <td align="center" valign="middle">
+					Highlight<br />
+						<input type="range" class="shadow-space" min="0" max="255" step="1" id="highlight"/><br />
+					Shadow<br />
+						<input type="range" class="shadow-space" min="0" max="255" step="1" id="shadow"/><br />
+					Gamma<br />
+						<input type="range" class="shadow-space" min="0.9" max="10.7" step="0.1" id="gamma"/><br />
+                </td>
+                <td align="center" valign="middle">
+					Brightness<br />
+						<input type="range" class="brightness-space" min="-100" max="100" step="1" id="brightness"/><br />
+					Contrast<br />
+						<input type="range" class="brightness-space" min="-100" max="100" step="1" id="contrast"/><br />
+                </td>
+                </tr>
+                </table>
+                <br />
+                <table width="530">
+                <tr>
+                <td align="center">
+					Auto-Crop <br />
+                    <label><input type="checkbox" class="ios-switch" id="autoCrop"/></label><br />
+                </td>
+                <td align="center">
+					Auto-Rotate<br />
+                    <label><input type="checkbox" class="ios-switch" id="autoRotate"/></label><br />
+                </td>
+                <td align="center">
+               		Deskew<br />
+                    <label><input type="checkbox" class="ios-switch" id="deskew"/></label><br />
+                </td>
+                <td align="center">
+					Blank Page Detection<br />
+                    <label><input type="checkbox" class="ios-switch" id="blankPageDetection"/></label><br />
+                </td>
+                </tr>
+                </table><br /><br /><br />
+                
+               		 <div class="save-cancel">
+                     	<table>
+                        	<tr>
+                            <td>
+								 <button class="md-close btn-clear" onclick="saveSettings()">Save</button>
+                            </td>
+                            <td>
+                   				 <button class="md-cancel btn-clear">Cancel</button>
+                            </td>
+                            </tr>
+                         </table>
+               		 </div>
+				</div>
+			</div>
+		</div>
+	</center></body>
+	<script src="js/classie.js"></script>
+	<script src="js/modalEffects.js"></script>
+    <script>
+		if (parent === window) {
+			document.addEventListener('DOMContentLoaded', function() {
+				//Adds some <div>s for styling
+				var switches = document.querySelectorAll('input[type="checkbox"].ios-switch');			
+				for (var i=0, sw; sw = switches[i++]; ) {
+					var div = document.createElement('div');
+					div.className = 'switch';
+					sw.parentNode.insertBefore(div, sw.nextSibling);
+				}	
+			});
+		}
+	</script>
+</html>
