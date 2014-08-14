@@ -7,7 +7,7 @@
   
 <head>
 	<title>SimpleECM Demo Advanced Capture Page</title>
-	<script src="js/jquery-1.11.0.js">//the browser driver's only dependency is jquery</script>
+	<script src="js/jquery-1.11.0.js"></script>
 	<script src="https://browserdriver.simpleecm.com/bd/1/latest/browser_driver.js"></script>
 	<script>
 		var currentJobImages = new Array();
@@ -47,7 +47,9 @@
 		}
 		
 		function handleDeviceVanished() {
+			document.getElementById("statusImage").src = "/images/spiffygif_30x30.gif";
 			document.getElementById("statusMessage").innerHTML = "Please attach a scanner";
+			document.getElementById("settingsButton").disabled = true;
 		}
 		
 		//the attachedDevice arg is a complex object telling us all about the device
@@ -57,6 +59,8 @@
 			//the capabilities object itself has a function to create a settings object using the default settings for this device
 			scanSettings = deviceCapabilities.toSettings();
 			loadSettings();
+			//display an image of the scanner
+			document.getElementById("statusImage").src = attachedDevice.deviceImageUrl;
 			document.getElementById("statusMessage").innerHTML = "Scanner ready - please load a document";
 			document.getElementById("settingsButton").disabled = false;
 		}
@@ -75,7 +79,8 @@
 		function handleNewImageReady(newScannedImage) {
 			document.getElementById("sendButton").disabled = false;
 			document.getElementById("clearButton").disabled = false;
-			//hide the status message, since it overlaps the image in this UI
+			//hide the status image and message, since they overlap the image in this UI
+			document.getElementById("statusImage").style.display = "none";
 			document.getElementById("statusMessage").style.display = "none";
 			var currentImageId = newScannedImage.id;
 			//log the ID in the currentJobImages array
@@ -127,6 +132,7 @@
 			document.getElementById("clearButton").disabled = true;
 			document.getElementById("scannedImages").src = "";
 			document.getElementById("statusMessage").innerHTML = "Sending to forms processing...";
+			document.getElementById("statusImage").style.display = "inline";
 			document.getElementById("statusMessage").style.display = "inline";
 			var docToSend = [];
 			var i, pageN, imageId;
@@ -138,7 +144,7 @@
 			var sendArgs = {
 				pages: docToSend,
 				//pass a url where a servlet is waiting for a pdf file to submit for form extraction
-            	submissionUrl: "https://demo.simpleecm.com/doFormExtract",
+            	submissionUrl: "https://dev.testco.com/doFormExtract",
             	//pass an array of parameters - in this case, the name of the formSet to use
             	parameters: [{ name: "formSetId", value: "MedicalForms" }],
             	//pass a filename - I've appended datetime to make each unique
@@ -158,6 +164,7 @@
 			currentJobImages = [];
 			document.getElementById("scannedImages").src = "";
 			currentImageDisplayed = 0;
+			document.getElementById("statusImage").style.display = "inline";
 			document.getElementById("statusMessage").style.display = "inline";
 		}
 		
@@ -239,7 +246,7 @@
 <body onload="initializeBD()">
 <center>
 <p class="branding"><img src="images/brain-hospital.png"></p>
-   	<span id="statusMessage" class="spinner-position"><div class="spinner medium"></div></span>
+   	<span class="spinner-position"><img id="statusImage" src="/images/spiffygif_30x30.gif"></img><br><br><div id="statusMessage"></div></span>
 	<iframe id="scannedImages" style="width:306px;height:400px;" src=""></iframe><br />
 	<div class="arrow-position">
     <button id="prevButton" onclick="prevImage()" disabled class="btn-arrow" style="float:left;">&#60;</button>
@@ -248,7 +255,7 @@
     <button id="sendButton" onclick="sendDocument()" disabled class="btn-green">Send</button><br />
 	<button id="clearButton" onclick="clearImages()" disabled class="btn-clear">Clear</button>
 	<button id="settingsButton" disabled class="md-trigger btn-clear" data-modal="modal-1">Settings</button><br />
-	<form action="http://demo.simpleecm.com/new-patient-form.html"><button id="toValidation" type="submit" disabled class="btn-clear">Next &#62;</button></form>
+	<form action="http://dev.testco.com/new-patient-form.html"><button id="toValidation" type="submit" disabled class="btn-clear">Next &#62;</button></form>
   <div class="md-modal md-effect-1" id="modal-1">
 			<div class="md-content">
 				<h3> </h3>
@@ -343,8 +350,9 @@
     <script>
 		if (parent === window) {
 			document.addEventListener('DOMContentLoaded', function() {
-				//Adds some <div>s for styling
-				var switches = document.querySelectorAll('input[type="checkbox"].ios-switch');			
+				// Adds some <div>s for styling
+				var switches = document.querySelectorAll('input[type="checkbox"].ios-switch');
+				
 				for (var i=0, sw; sw = switches[i++]; ) {
 					var div = document.createElement('div');
 					div.className = 'switch';
